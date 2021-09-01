@@ -126,6 +126,9 @@ auto LoadYAMLIntoMap(const filesystem::path& hPath, unordered_map<string, string
 			if (szBuffer.ends_with(':'))	// Skip the first line, like "l_english:" stuff.
 				continue;
 
+			if (szBuffer.empty())
+				continue;
+
 			size_t iBreakPos = szBuffer.find_first_of(':');
 			m[szBuffer.substr(0U, iBreakPos)] = move(szBuffer);
 		}
@@ -169,7 +172,8 @@ void CreatePlaceholder(const string& from, const string& to)
 					getline(hSourceStream, szBuffer);
 					UTIL_ReplaceAll(szBuffer, g_rgszFieldKey[from], g_rgszFieldKey[to]);	// "l_english:", "l_simp_chinese:"
 
-					output_file << szBuffer << endl;
+					if (szBuffer.length())	// Skip empty lines.
+						output_file << szBuffer << endl;
 				}
 
 				cout << "Created: " << szOutputFilePath << endl;
@@ -204,6 +208,9 @@ void CreatePlaceholder(const string& from, const string& to)
 					hOutputStream << szSpaces << szValue << endl;
 					cout << "Inserting: " << quoted(szKey) << " into file: " << szOutputFilePath << endl;
 				}
+
+				if (!bFirstInserted)	// Nothing had inserted.
+					cout << "Skipping: " << szOutputFilePath << endl;
 			}
 		}
 	}
