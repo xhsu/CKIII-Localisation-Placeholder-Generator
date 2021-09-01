@@ -16,6 +16,69 @@
 
 using namespace std;
 
+unordered_map<string, string> g_rgszFileSuffix =
+{
+	{"english",			"_l_english.yml"},
+	{"french",			"_l_french.yml"},
+	{"german",			"_l_german.yml"},
+	{"korean",			"_l_korean.yml"},
+	{"russian",			"_l_russian.yml"},
+	{"simp_chinese",	"_l_simp_chinese.yml"},
+	{"spanish",			"_l_spanish.yml"},
+};
+
+unordered_map<string, string> g_rgszLocalisationFolder =
+{
+	{"english",			"english\\"},
+	{"french",			"french\\"},
+	{"german",			"german\\"},
+	{"korean",			"korean\\"},
+	{"russian",			"russian\\"},
+	{"simp_chinese",	"simp_chinese\\"},
+	{"spanish",			"spanish\\"},
+};
+
+unordered_map<string, string> g_rgszFieldKey =
+{
+	{"english",			"l_english:"},
+	{"french",			"l_french:"},
+	{"german",			"l_german:"},
+	{"korean",			"l_korean:"},
+	{"russian",			"l_russian:"},
+	{"simp_chinese",	"l_simp_chinese:"},
+	{"spanish",			"l_spanish:"},
+};
+
+string UTIL_LanguageForShort(char c)
+{
+	switch (c)
+	{
+	case 'f':
+		return "french";
+
+	case 'g':
+		return "german";
+
+	case 'k':
+		return "korean";
+
+	case 'r':
+		return "russian";
+
+	case 'c':
+		return "simp_chinese";
+
+	case 's':
+		return "spanish";
+
+	default:
+		cout << "Unknown language code '" << c << "' !" << endl;	// don't input random stuff, thanks for your cooperation.
+
+	case 'e':
+		return "english";
+	}
+}
+
 void UTIL_ReplaceAll(string& str, const string& from, const string& to)
 {
 	if (from.empty())
@@ -71,18 +134,18 @@ auto LoadYAMLIntoMap(const filesystem::path& hPath, unordered_map<string, string
 	return iResult;
 }
 
-int main()
+void CreatePlaceholder(const string& from, const string& to)
 {
 	string szBuffer;
 
-	for (const auto& hPath : filesystem::recursive_directory_iterator("english"))
+	for (const auto& hPath : filesystem::recursive_directory_iterator(from))	// "english"
 	{
-		if (hPath.is_directory() || !hPath.path().string().ends_with("_l_english.yml"))
+		if (hPath.is_directory() || !hPath.path().string().ends_with(g_rgszFileSuffix[from]))	// "_l_english.yml"
 			continue;
 
 		string szOutputFilePath = hPath.path().string();
-		UTIL_ReplaceAll(szOutputFilePath, "_l_english.yml", "_l_simp_chinese.yml");
-		UTIL_ReplaceAll(szOutputFilePath, "english\\", "simp_chinese\\");
+		UTIL_ReplaceAll(szOutputFilePath, g_rgszFileSuffix[from], g_rgszFileSuffix[to]);	// "_l_english.yml", "_l_simp_chinese.yml"
+		UTIL_ReplaceAll(szOutputFilePath, g_rgszLocalisationFolder[from], g_rgszLocalisationFolder[to]);	// "english\\", "simp_chinese\\"
 
 		auto hOutputFilePath = filesystem::path(szOutputFilePath);
 
@@ -104,7 +167,7 @@ int main()
 				while (!hSourceStream.eof())
 				{
 					getline(hSourceStream, szBuffer);
-					UTIL_ReplaceAll(szBuffer, "l_english:", "l_simp_chinese:");
+					UTIL_ReplaceAll(szBuffer, g_rgszFieldKey[from], g_rgszFieldKey[to]);	// "l_english:", "l_simp_chinese:"
 
 					output_file << szBuffer << endl;
 				}
@@ -132,8 +195,8 @@ int main()
 
 					if (!bFirstInserted)
 					{
-						auto hTimeNow =chrono::system_clock::to_time_t(chrono::system_clock::now());	// #FIXME MSVC C++20 have no std::chrono::operator<< (std::chrono::year_month_day)
-						
+						auto hTimeNow = chrono::system_clock::to_time_t(chrono::system_clock::now());	// #FIXME MSVC C++20 have no std::chrono::operator<< (std::chrono::year_month_day)
+
 						hOutputStream << endl << szSpaces << "# Automatically added at: " << ctime(&hTimeNow);	// end of line included.
 						bFirstInserted = true;
 					}
@@ -143,6 +206,49 @@ int main()
 				}
 			}
 		}
+	}
+}
+
+int main()
+{
+	char from = 0, to = 0;
+	string szFrom, szTo;
+
+LAB_ASK_FOR_FROM:;
+	cout << "From what language?" << endl;
+	cin >> from;
+	szFrom = UTIL_LanguageForShort(from);
+
+	if (!filesystem::exists(szFrom))
+	{
+		cout << "Localisation folder " << quoted(szFrom) << " no found!" << endl;
+		goto LAB_ASK_FOR_FROM;
+	}
+
+	cout << "Generate from language: " << quoted(szFrom) << endl << endl;
+
+	cout << "To what language?" << endl;
+	cin >> to;
+
+	if (to == 'a')	// ALL languages.
+	{
+		for (auto& [szKey, szValue] : g_rgszLocalisationFolder)
+		{
+			if (szKey == szFrom)	// Skipping original language.
+				continue;
+
+			cout << "Generating placeholder for language " << quoted(szKey) << " ..." << endl << endl;
+			CreatePlaceholder(szFrom, szKey);
+			cout << endl;
+		}
+	}
+	else
+	{
+		szTo = UTIL_LanguageForShort(to);
+		cout << "Generating placeholder for language " << quoted(szTo) << " ..." << endl << endl;
+
+		CreatePlaceholder(szFrom, szTo);
+		cout << endl;
 	}
 
 	system("pause");
