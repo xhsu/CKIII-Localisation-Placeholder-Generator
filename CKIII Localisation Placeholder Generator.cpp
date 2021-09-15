@@ -123,6 +123,9 @@ auto LoadYAMLIntoMap(const filesystem::path& hPath, unordered_map<string, string
 
 			UTIL_Trim(szBuffer);
 
+			if (szBuffer.starts_with('#'))	// Skip the commented line in original texts.
+				continue;
+
 			if (szBuffer.ends_with(':'))	// Skip the first line, like "l_english:" stuff.
 				continue;
 
