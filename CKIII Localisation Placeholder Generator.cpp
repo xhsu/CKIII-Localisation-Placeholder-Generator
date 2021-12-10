@@ -219,10 +219,32 @@ void CreatePlaceholder(const string& from, const string& to)
 	}
 }
 
-int main()
+int main(int argc, char** argv)
 {
 	char from = 0, to = 0;
 	string szFrom, szTo;
+
+	switch (argc)
+	{
+	case 3:
+		to = *(argv[2]);
+		[[fallthrough]];
+	case 2:
+		szFrom = UTIL_LanguageForShort(from = *(argv[1]));
+		[[fallthrough]];
+	default:
+		break;
+	}
+
+	switch (argc)
+	{
+	case 3:
+		goto LAB_ANALYZING_ARG;
+	case 2:
+		goto LAB_ASK_FOR_TO;
+	default:
+		break;
+	}
 
 LAB_ASK_FOR_FROM:;
 	cout << "From what language?" << endl;
@@ -235,11 +257,13 @@ LAB_ASK_FOR_FROM:;
 		goto LAB_ASK_FOR_FROM;
 	}
 
+LAB_ASK_FOR_TO:;
 	cout << "Generate from language: " << quoted(szFrom) << endl << endl;
 
 	cout << "To what language?" << endl;
 	cin >> to;
 
+LAB_ANALYZING_ARG:;
 	if (to == 'a')	// ALL languages.
 	{
 		for (auto& [szKey, szValue] : g_rgszLocalisationFolder)
