@@ -157,6 +157,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\Documents\GitHub\Hydrogenium\UtlConcepts.ixx" />
+    <ClCompile Include="..\..\Documents\GitHub\Hydrogenium\UtlWinConsole.ixx" />
     <ClCompile Include="CKIII Localisation Placeholder Generator.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

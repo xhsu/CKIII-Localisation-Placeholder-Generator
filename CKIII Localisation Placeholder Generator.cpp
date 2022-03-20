@@ -14,6 +14,9 @@
 //import std.core;
 //import std.filesystem;
 
+// My custom modules
+import UtlWinConsole;
+
 using namespace std;
 
 unordered_map<string, string> g_rgszFileSuffix =
@@ -49,7 +52,7 @@ unordered_map<string, string> g_rgszFieldKey =
 	{"spanish",			"l_spanish:"},
 };
 
-string UTIL_LanguageForShort(char c)
+string UTIL_LanguageForShort(char c) noexcept
 {
 	switch (c)
 	{
@@ -72,14 +75,15 @@ string UTIL_LanguageForShort(char c)
 		return "spanish";
 
 	default:
-		cout << "Unknown language code '" << c << "' !" << endl;	// don't input random stuff, thanks for your cooperation.
+		cout_r() << "Unknown language code '" << c << "' !" << endl;	// don't input random stuff, thanks for your cooperation.
+		[[fallthrough]];
 
 	case 'e':
 		return "english";
 	}
 }
 
-void UTIL_ReplaceAll(string& str, const string& from, const string& to)
+void UTIL_ReplaceAll(string& str, const string& from, const string& to) noexcept
 {
 	if (from.empty())
 		return;
@@ -92,7 +96,7 @@ void UTIL_ReplaceAll(string& str, const string& from, const string& to)
 	}
 }
 
-void UTIL_Trim(string& str)
+void UTIL_Trim(string& str) noexcept
 {
 	static const auto fnNotSpace = [](unsigned char c) { return !std::isspace(c); };
 
@@ -100,14 +104,14 @@ void UTIL_Trim(string& str)
 	str.erase(find_if(str.rbegin(), str.rend(), fnNotSpace).base(), str.end());	// R trim. std::reverse_iterator<Iter>::base() represents the true position of reversed iterator.
 }
 
-auto UTIL_GetSpaceCount(const string& str)	// L space
+auto UTIL_GetSpaceCount(const string& str) noexcept	// L space
 {
 	static const auto fnNotSpace = [](unsigned char c) { return !std::isspace(c); };
 
 	return distance(str.begin(), find_if(str.begin(), str.end(), fnNotSpace));
 }
 
-auto LoadYAMLIntoMap(const filesystem::path& hPath, unordered_map<string, string>& m)
+auto LoadYAMLIntoMap(const filesystem::path& hPath, unordered_map<string, string>& m) noexcept
 {
 	invoke_result_t<decltype(UTIL_GetSpaceCount), const string&> iResult = 0;
 
@@ -140,11 +144,11 @@ auto LoadYAMLIntoMap(const filesystem::path& hPath, unordered_map<string, string
 	return iResult;
 }
 
-void CreatePlaceholder(const string& from, const string& to)
+void CreatePlaceholder(const filesystem::path& mod, const string& from, const string& to) noexcept
 {
 	string szBuffer;
 
-	for (const auto& hPath : filesystem::recursive_directory_iterator(from))	// "english"
+	for (const auto& hPath : filesystem::recursive_directory_iterator(mod / "localization" / from))	// "english"
 	{
 		if (hPath.is_directory() || !hPath.path().string().ends_with(g_rgszFileSuffix[from]))	// "_l_english.yml"
 			continue;
@@ -162,7 +166,7 @@ void CreatePlaceholder(const string& from, const string& to)
 				if (auto hOutputFileDir = hOutputFilePath.parent_path(); !filesystem::exists(hOutputFileDir))
 				{
 					filesystem::create_directories(hOutputFileDir);	// Use create_directories() to create entire folder structure.
-					cout << "Folder Created: " << hOutputFileDir.string() << endl;
+					cout_silver() << "Folder Created: " << hOutputFileDir.string() << endl;
 				}
 
 				ofstream output_file(szOutputFilePath, ios::out);
@@ -179,10 +183,10 @@ void CreatePlaceholder(const string& from, const string& to)
 						output_file << szBuffer << endl;
 				}
 
-				cout << "Created: " << szOutputFilePath << endl;
+				cout_silver() << "Created: " << szOutputFilePath << endl;
 			}
 			else
-				cout << "Error: Could not open source file: " << hPath.path() << endl;
+				cout_r() << "Error: Could not open source file: " << hPath.path() << endl;
 		}
 		else	// i.e. Need to compare with the source one.
 		{
@@ -209,18 +213,70 @@ void CreatePlaceholder(const string& from, const string& to)
 					}
 
 					hOutputStream << szSpaces << szValue << endl;
-					cout << "Inserting: " << quoted(szKey) << " into file: " << szOutputFilePath << endl;
+					cout_silver() << "Inserting: " << quoted(szKey) << " into file: " << szOutputFilePath << endl;
 				}
 
 				if (!bFirstInserted)	// Nothing had inserted.
-					cout << "Skipping: " << szOutputFilePath << endl;
+					cout_gray() << "Skipping: " << szOutputFilePath << endl;
 			}
 		}
 	}
 }
 
-int main(int argc, char** argv)
+string GetModName(const filesystem::path& mod) noexcept
 {
+	if (!atoi(mod.filename().string().c_str()))
+		return mod.filename().string();	// It must be a mod with proper text name.
+
+	auto hDesc = mod / "descriptor.mod";
+
+	if (!filesystem::exists(hDesc))
+		return "ERROR - NO DESCRIPTOR FOUNDED!";
+
+	string ret = "";
+
+	if (FILE* f = fopen(hDesc.string().c_str(), "rb"); f != nullptr)
+	{
+		fseek(f, 0, SEEK_END);
+		auto iLength = ftell(f);
+		char* pbuf = (char*)calloc(iLength + 1, sizeof(char));
+
+		fseek(f, 0, SEEK_SET);
+		fread(pbuf, sizeof(char), iLength, f);
+		fclose(f);
+		f = nullptr;
+
+		for (const char* p = pbuf; p != pbuf + iLength + 1; ++p)
+		{
+			if (!_strnicmp(p, "name", 4))
+			{
+				for (; p != pbuf + iLength + 1; ++p)
+				{
+					if (*p == '"')
+					{
+						++p;
+						break;
+					}
+				}
+
+				ret = p;
+				break;
+			}
+		}
+
+		free(pbuf);
+		ret.erase(ret.find_first_of('"'));
+	}
+
+	return ret;
+}
+
+int main(int argc, char** argv) noexcept
+{
+	ios_base::sync_with_stdio(false);	// We are not using C function "printf" thus just turn it off.
+
+	const bool bBatchMode = !filesystem::exists("descriptor.mod");
+
 	char from = 0, to = 0;
 	string szFrom, szTo;
 
@@ -247,44 +303,89 @@ int main(int argc, char** argv)
 	}
 
 LAB_ASK_FOR_FROM:;
-	cout << "From what language?" << endl;
+	cout_w() << "From what language?" << endl;
 	cin >> from;
 	szFrom = UTIL_LanguageForShort(from);
 
-	if (!filesystem::exists(szFrom))
+	if (!bBatchMode && !filesystem::exists(szFrom))
 	{
-		cout << "Localisation folder " << quoted(szFrom) << " no found!" << endl;
+		cout_r() << "Localisation folder " << quoted(szFrom) << " no found!" << endl;
 		goto LAB_ASK_FOR_FROM;
 	}
 
-LAB_ASK_FOR_TO:;
-	cout << "Generate from language: " << quoted(szFrom) << endl << endl;
+	cout_w() << "Generate from language: " << quoted(szFrom) << endl << endl;
 
-	cout << "To what language?" << endl;
+LAB_ASK_FOR_TO:;
+	cout_w() << "To what language?" << endl;
 	cin >> to;
 
-LAB_ANALYZING_ARG:;
-	if (to == 'a')	// ALL languages.
+	if (to == from)
 	{
-		for (auto& [szKey, szValue] : g_rgszLocalisationFolder)
+		cout_r() << "Same languague between source and target." << endl;
+		goto LAB_ASK_FOR_TO;
+	}
+
+LAB_ANALYZING_ARG:;
+
+	const auto fnCreatePlaceholderForMod = [&](const filesystem::path& hModPath = filesystem::current_path())
+	{
+		if (hModPath != filesystem::current_path())
+			cout_skyblue() << "\nProcessing mod: " << cyan_text << GetModName(hModPath) << endl;
+
+		if (!filesystem::exists(hModPath / "localization" / szFrom))
 		{
-			if (szKey == szFrom)	// Skipping original language.
+			cout_r() << "Skipping: Source language " << quoted(szFrom) << " no found." << endl;
+			return;
+		}
+
+		if (to == 'a')	// ALL languages.
+		{
+			for (auto& [szKey, szValue] : g_rgszLocalisationFolder)
+			{
+				if (szKey == szFrom)	// Skipping original language.
+					continue;
+
+				cout_skyblue() << "Generating placeholder for language " << cyan_text << quoted(szKey) << skyblue_text << " ..." << endl;
+				CreatePlaceholder(hModPath, szFrom, szKey);
+				cout << endl;
+			}
+		}
+		else
+		{
+			szTo = UTIL_LanguageForShort(to);
+			cout_skyblue() << "Generating placeholder for language " << cyan_text << quoted(szTo) << skyblue_text << " ..." << endl;
+
+			CreatePlaceholder(hModPath, szFrom, szTo);
+			cout << endl;
+		}
+	};
+
+	if (bBatchMode)	// For all mods in this folder.
+	{
+		for (const auto& hEntry : filesystem::directory_iterator(filesystem::current_path()))
+		{
+			if (!hEntry.is_directory())
 				continue;
 
-			cout << "Generating placeholder for language " << quoted(szKey) << " ..." << endl << endl;
-			CreatePlaceholder(szFrom, szKey);
-			cout << endl;
+			if (!filesystem::exists(hEntry.path() / "descriptor.mod"))	// Is this folder a mod?
+			{
+				cout_gold() << "Skipping non-mod folder " << quoted(hEntry.path().filename().string()) << '.' << endl;
+				continue;
+			}
+			
+			if (!filesystem::exists(hEntry.path() / "localization"))	// Is this mod contains a localization folder?
+			{
+				cout_gold() << "Skipping non-localizable mod " << quoted(hEntry.path().filename().string()) << '.' << endl;
+				continue;
+			}
+
+			fnCreatePlaceholderForMod(hEntry);
 		}
 	}
 	else
-	{
-		szTo = UTIL_LanguageForShort(to);
-		cout << "Generating placeholder for language " << quoted(szTo) << " ..." << endl << endl;
+		fnCreatePlaceholderForMod();
 
-		CreatePlaceholder(szFrom, szTo);
-		cout << endl;
-	}
-
+	cout_w();
 	system("pause");
 	return EXIT_SUCCESS;
 }
