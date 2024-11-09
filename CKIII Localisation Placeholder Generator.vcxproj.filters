@@ -3,5 +3,16 @@
   <ItemGroup>
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="FetchConsoleColor.cpp" />
+    <ClCompile Include="fmtlib\src\format.cc">
+      <Filter>fmtlib</Filter>
+    </ClCompile>
+    <ClCompile Include="fmtlib\src\os.cc">
+      <Filter>fmtlib</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="fmtlib">
+      <UniqueIdentifier>{c5703104-7852-4609-9eb4-8fd813ca99c4}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
 </Project>

@@ -3,6 +3,7 @@
 
 
 // C++ STL
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -24,8 +25,9 @@ namespace Style
 	inline constexpr auto Action = fmt::fg(fmt::color::sky_blue);
 }
 
-namespace filesystem = std::filesystem;
 namespace chrono = std::chrono;
+namespace filesystem = std::filesystem;
+namespace ranges = std::ranges;
 
 using std::fstream;
 using std::invoke_result_t;
@@ -116,15 +118,15 @@ void UTIL_Trim(string* str) noexcept
 {
 	static const auto fnNotSpace = [](unsigned char c) { return !std::isspace(c); };
 
-	str->erase(str->begin(), find_if(str->begin(), str->end(), fnNotSpace));	// L trim
-	str->erase(find_if(str->rbegin(), str->rend(), fnNotSpace).base(), str->end());	// R trim. std::reverse_iterator<Iter>::base() represents the true position of reversed iterator.
+	str->erase(str->begin(), ranges::find_if(*str, fnNotSpace));	// L trim
+	str->erase(ranges::find_if(str->rbegin(), str->rend(), fnNotSpace).base(), str->end());	// R trim. std::reverse_iterator<Iter>::base() represents the true position of reversed iterator.
 }
 
 auto UTIL_GetSpaceCount(string_view str) noexcept	// L space
 {
 	static const auto fnNotSpace = [](unsigned char c) { return !std::isspace(c); };
 
-	return distance(str.begin(), find_if(str.begin(), str.end(), fnNotSpace));
+	return std::distance(str.begin(), ranges::find_if(str, fnNotSpace));
 }
 
 auto LoadYAMLIntoMap(const filesystem::path& hPath, unordered_map<string, string>* m) noexcept
@@ -245,7 +247,7 @@ void CreatePlaceholder(const filesystem::path& mod, string_view from, string_vie
 	}
 }
 
-string GetModName(const filesystem::path& mod) noexcept
+auto GetModName(const filesystem::path& mod) noexcept -> string
 {
 	if (!atoi(mod.filename().u8string().c_str()))
 		return mod.filename().u8string();	// It must be a mod with proper text name.
@@ -271,7 +273,7 @@ string GetModName(const filesystem::path& mod) noexcept
 
 		for (const char* p = pbuf; p != pend; ++p)
 		{
-			if (!_strnicmp(p, "name", 4))	// Must use strnicmp instead of strcmp. The later have '\0' included.
+			if (_strnicmp(p, "name", 4) == 0)	// Must use strnicmp instead of strcmp. The later have '\0' included.
 			{
 				for (; p != pend; ++p)
 				{
@@ -296,7 +298,7 @@ string GetModName(const filesystem::path& mod) noexcept
 
 extern void FetchConsoleColor() noexcept;
 
-int main(int argc, char** argv) noexcept
+int main(int argc, char* argv[]) noexcept
 {
 	std::ios_base::sync_with_stdio(false);	// We are not using C function "printf" thus just turn it off.
 
