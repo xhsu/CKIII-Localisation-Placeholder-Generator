@@ -71,7 +71,7 @@ class dynamic_arg_list {
  * It can be implicitly converted into `fmt::basic_format_args` for passing
  * into type-erased formatting functions such as `fmt::vformat`.
  */
-template <typename Context> class dynamic_format_arg_store {
+FMT_EXPORT template <typename Context> class dynamic_format_arg_store {
  private:
   using char_type = typename Context::char_type;
 
@@ -210,6 +210,9 @@ template <typename Context> class dynamic_format_arg_store {
     data_.reserve(new_cap);
     named_info_.reserve(new_cap_named);
   }
+
+  /// Returns the number of elements in the store.
+  auto size() const noexcept -> size_t { return data_.size(); }
 };
 
 FMT_END_NAMESPACE
