@@ -8,6 +8,7 @@
     <ClCompile Include="fmtlib\src\os.cc">
       <Filter>fmtlib</Filter>
     </ClCompile>
+    <ClCompile Include="Application.ixx" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="fmtlib">

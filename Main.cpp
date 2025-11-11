@@ -16,6 +16,8 @@
 #include <fmt/color.h>
 #include <fmt/ostream.h>
 
+import Application;
+
 namespace Style
 {
 	inline constexpr auto Error = fmt::fg(fmt::color::red);
@@ -297,6 +299,19 @@ static auto GetModName(const filesystem::path& mod) noexcept -> string
 int main(int argc, char* argv[]) noexcept
 {
 	std::ios_base::sync_with_stdio(false);	// We are not using C function "printf" thus just turn it off.
+
+#pragma region APP INFO
+	if (argc == 2 && std::string_view{argv[1]} == "-version")
+	{
+		fmt::println("CKIII Localisation Placeholder Generator v{}",
+			APP_VERSION_STRING
+		);
+		fmt::println("\tUtilizing fmtlib version {}",
+			FMT_VERSION
+		);
+		return EXIT_SUCCESS;
+	}
+#pragma endregion
 
 	const bool bBatchMode = !filesystem::exists("descriptor.mod");
 

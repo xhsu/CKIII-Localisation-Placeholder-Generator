@@ -82,6 +82,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Application.ixx" />
     <ClCompile Include="fmtlib\src\format.cc" />
     <ClCompile Include="fmtlib\src\os.cc" />
     <ClCompile Include="Main.cpp" />
