@@ -7,9 +7,10 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <map>
+#include <ranges>
 #include <string_view>
 #include <string>
-#include <unordered_map>
 
 #include <fmt/chrono.h>
 #include <fmt/color.h>
@@ -30,47 +31,33 @@ namespace filesystem = std::filesystem;
 namespace ranges = std::ranges;
 
 using std::fstream;
-using std::invoke_result_t;
 using std::ios;
+using std::map;
 using std::ofstream;
 using std::string;
 using std::string_view;
-using std::unordered_map;
 
-unordered_map<string_view, string_view> g_rgszFileSuffix =
+struct CLocalizationInfo final	// #UPDATE_AT_CPP26 compile-time string.
 {
-	{"english",			"_l_english.yml"},
-	{"french",			"_l_french.yml"},
-	{"german",			"_l_german.yml"},
-	{"korean",			"_l_korean.yml"},
-	{"russian",			"_l_russian.yml"},
-	{"simp_chinese",	"_l_simp_chinese.yml"},
-	{"spanish",			"_l_spanish.yml"},
+	string_view m_FileSuffix{};
+	string_view m_LocalizationFolder{};
+	string_view m_YamlFieldKey{};
 };
 
-unordered_map<string_view, string_view> g_rgszLocalisationFolder =
+inline const map<string_view, CLocalizationInfo, std::less<>> g_rgszLocalizationInfo
 {
-	{"english",			"english\\"},
-	{"french",			"french\\"},
-	{"german",			"german\\"},
-	{"korean",			"korean\\"},
-	{"russian",			"russian\\"},
-	{"simp_chinese",	"simp_chinese\\"},
-	{"spanish",			"spanish\\"},
+	{ "english",      { "_l_english.yml", "english\\", "l_english:" } },
+	{ "french",       { "_l_french.yml", "french\\", "l_french:" } },
+	{ "german",       { "_l_german.yml", "german\\", "l_german:" } },
+	{ "japanese",     { "_l_japanese.yml", "japanese\\", "l_japanese:" } },
+	{ "korean",       { "_l_korean.yml", "korean\\", "l_korean:" } },
+	{ "polish",       { "_l_polish.yml", "polish\\", "l_polish:" } },
+	{ "russian",      { "_l_russian.yml", "russian\\", "l_russian:" } },
+	{ "simp_chinese", { "_l_simp_chinese.yml", "simp_chinese\\", "l_simp_chinese:" } },
+	{ "spanish",      { "_l_spanish.yml", "spanish\\", "l_spanish:" } },
 };
 
-unordered_map<string_view, string_view> g_rgszFieldKey =
-{
-	{"english",			"l_english:"},
-	{"french",			"l_french:"},
-	{"german",			"l_german:"},
-	{"korean",			"l_korean:"},
-	{"russian",			"l_russian:"},
-	{"simp_chinese",	"l_simp_chinese:"},
-	{"spanish",			"l_spanish:"},
-};
-
-string_view UTIL_LanguageForShort(char c) noexcept
+static string_view UTIL_LanguageForShort(char c) noexcept
 {
 	switch (c)
 	{
@@ -80,8 +67,14 @@ string_view UTIL_LanguageForShort(char c) noexcept
 	case 'g':
 		return "german";
 
+	case 'j':
+		return "japanese";
+
 	case 'k':
 		return "korean";
+
+	case 'p':
+		return "polish";
 
 	case 'r':
 		return "russian";
@@ -101,7 +94,7 @@ string_view UTIL_LanguageForShort(char c) noexcept
 	}
 }
 
-void UTIL_ReplaceAll(string* str, string_view from, string_view to) noexcept
+static constexpr void UTIL_ReplaceAll(string* str, string_view from, string_view to) noexcept
 {
 	if (from.empty())
 		return;
@@ -114,24 +107,26 @@ void UTIL_ReplaceAll(string* str, string_view from, string_view to) noexcept
 	}
 }
 
-void UTIL_Trim(string* str) noexcept
+static void UTIL_Trim(string* str) noexcept
 {
-	static const auto fnNotSpace = [](unsigned char c) { return !std::isspace(c); };
+	static constexpr auto fnNotSpace =
+		[](unsigned char c) static noexcept { return !std::isspace(c); };
 
 	str->erase(str->begin(), ranges::find_if(*str, fnNotSpace));	// L trim
 	str->erase(ranges::find_if(str->rbegin(), str->rend(), fnNotSpace).base(), str->end());	// R trim. std::reverse_iterator<Iter>::base() represents the true position of reversed iterator.
 }
 
-auto UTIL_GetSpaceCount(string_view str) noexcept	// L space
+static auto UTIL_GetSpaceCount(string_view str) noexcept // L space
 {
-	static const auto fnNotSpace = [](unsigned char c) { return !std::isspace(c); };
+	static constexpr auto fnNotSpace =
+		[](unsigned char c) static noexcept { return !std::isspace(c); };
 
 	return std::distance(str.begin(), ranges::find_if(str, fnNotSpace));
 }
 
-auto LoadYAMLIntoMap(const filesystem::path& hPath, unordered_map<string, string>* m) noexcept
+static auto LoadYAMLIntoMap(const filesystem::path& hPath, auto* m) noexcept
 {
-	invoke_result_t<decltype(UTIL_GetSpaceCount), string_view> iResult = 0;
+	decltype(UTIL_GetSpaceCount("")) iResult = 0;
 
 	if (fstream hFileStream(hPath, ios::in); hFileStream)
 	{
@@ -164,18 +159,21 @@ auto LoadYAMLIntoMap(const filesystem::path& hPath, unordered_map<string, string
 	return iResult;
 }
 
-void CreatePlaceholder(const filesystem::path& mod, string_view from, string_view to) noexcept
+static void CreatePlaceholder(const filesystem::path& mod, string_view from, string_view to) noexcept
 {
 	string szBuffer;
 
 	for (const auto& hPath : filesystem::recursive_directory_iterator(mod / "localization" / from))	// "english"
 	{
-		if (hPath.is_directory() || !hPath.path().u8string().ends_with(g_rgszFileSuffix[from]))	// "_l_english.yml"
+		auto& InfoOfSource = g_rgszLocalizationInfo.at(from);
+		auto& InfoOfDest = g_rgszLocalizationInfo.at(to);
+
+		if (hPath.is_directory() || !hPath.path().u8string().ends_with(InfoOfSource.m_FileSuffix))	// "_l_english.yml"
 			continue;
 
 		auto szOutputFilePath = hPath.path().u8string();
-		UTIL_ReplaceAll(&szOutputFilePath, g_rgszFileSuffix[from], g_rgszFileSuffix[to]);	// "_l_english.yml", "_l_simp_chinese.yml"
-		UTIL_ReplaceAll(&szOutputFilePath, g_rgszLocalisationFolder[from], g_rgszLocalisationFolder[to]);	// "english\\", "simp_chinese\\"
+		UTIL_ReplaceAll(&szOutputFilePath, InfoOfSource.m_FileSuffix, InfoOfDest.m_FileSuffix);	// "_l_english.yml", "_l_simp_chinese.yml"
+		UTIL_ReplaceAll(&szOutputFilePath, InfoOfSource.m_LocalizationFolder, InfoOfDest.m_LocalizationFolder);	// "english\\", "simp_chinese\\"
 
 		auto hOutputFilePath = filesystem::path(szOutputFilePath);
 
@@ -197,7 +195,7 @@ void CreatePlaceholder(const filesystem::path& mod, string_view from, string_vie
 				while (!hSourceStream.eof())
 				{
 					std::getline(hSourceStream, szBuffer);
-					UTIL_ReplaceAll(&szBuffer, g_rgszFieldKey[from], g_rgszFieldKey[to]);	// "l_english:", "l_simp_chinese:"
+					UTIL_ReplaceAll(&szBuffer, InfoOfSource.m_YamlFieldKey, InfoOfDest.m_YamlFieldKey);	// "l_english:", "l_simp_chinese:"
 
 					if (szBuffer.length())	// Skip empty lines.
 						output_file << szBuffer << std::endl;
@@ -211,7 +209,7 @@ void CreatePlaceholder(const filesystem::path& mod, string_view from, string_vie
 		else	// i.e. Need to compare with the source one.
 		{
 			bool bFirstInserted = false;
-			unordered_map<string, string> mSource, mOutput;
+			map<string, string, std::less<>> mSource, mOutput;	// #UPDATE_AT_CPP23 flat_map
 
 			LoadYAMLIntoMap(hPath.path(), &mSource);
 			auto const iSpaceCounts = LoadYAMLIntoMap(hOutputFilePath, &mOutput);
@@ -247,7 +245,7 @@ void CreatePlaceholder(const filesystem::path& mod, string_view from, string_vie
 	}
 }
 
-auto GetModName(const filesystem::path& mod) noexcept -> string
+static auto GetModName(const filesystem::path& mod) noexcept -> string
 {
 	if (!atoi(mod.filename().u8string().c_str()))
 		return mod.filename().u8string();	// It must be a mod with proper text name.
@@ -296,8 +294,6 @@ auto GetModName(const filesystem::path& mod) noexcept -> string
 	return ret;
 }
 
-extern void FetchConsoleColor() noexcept;
-
 int main(int argc, char* argv[]) noexcept
 {
 	std::ios_base::sync_with_stdio(false);	// We are not using C function "printf" thus just turn it off.
@@ -311,7 +307,7 @@ int main(int argc, char* argv[]) noexcept
 	fmt::println("===================================================================================");
 
 	char from = 0, to = 0;
-	string szFrom, szTo;
+	string_view szFrom{}, szTo{};
 
 	switch (argc)
 	{
@@ -340,7 +336,7 @@ LAB_ASK_FOR_FROM:;
 	std::cin >> from;
 	szFrom = UTIL_LanguageForShort(from);
 
-	if (!bBatchMode && !filesystem::exists(szFrom))
+	if (!bBatchMode && !filesystem::exists(filesystem::current_path() / L"localization" / szFrom))
 	{
 		fmt::print(Style::Error, "Localization folder \"{}\" no found!\n", szFrom);
 		goto LAB_ASK_FOR_FROM;
@@ -368,7 +364,7 @@ LAB_ANALYZING_ARG:;
 			fmt::print(Style::Name, "{}\n", GetModName(hModPath));
 		}
 
-		if (!filesystem::exists(hModPath / "localization" / szFrom))
+		if (!filesystem::exists(hModPath / L"localization" / szFrom))
 		{
 			fmt::print(Style::Error, "Skipping: Source language \"{}\" no found.\n", szFrom);
 			return;
@@ -376,7 +372,7 @@ LAB_ANALYZING_ARG:;
 
 		if (to == 'a')	// ALL languages.
 		{
-			for (auto&& [szKey, szValue] : g_rgszLocalisationFolder)
+			for (auto&& szKey : g_rgszLocalizationInfo | std::views::keys)
 			{
 				if (szKey == szFrom)	// Skipping original language.
 					continue;
